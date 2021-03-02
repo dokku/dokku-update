@@ -57,8 +57,10 @@ dokku-update-plugin() {
 }
 
 main() {
+  declare PROGRAM_NAME="$(basename "$0")"
   declare COMMAND="$1"
-  local DOKKU_DISTRO PLUGIN_NAME VERSION
+  declare PARAMETER="$2"
+  local DOKKU_DISTRO PLUGIN_NAME VERSION SYSTEM_UPDATES
 
   if [[ -f "/etc/os-release" ]]; then
     # shellcheck disable=SC1091
@@ -74,39 +76,65 @@ main() {
     exit 0
   fi
 
-  dokku-log-info "Running system updates"
-  case "$DOKKU_DISTRO" in
-    arch)
-      yay -Syyua
-      ;;
-    debian | ubuntu)
-      apt-get update -qq >/dev/null
-      apt-get -qq -y dist-upgrade
-      ;;
-    centos | opensuse | rhel)
-      dokku-log-warn "Updating this operating system is not supported"
-      ;;
-    *)
-      dokku-log-warn "Updating this operating system is not supported"
-      exit 1
-      ;;
-  esac
+  if [[ "$COMMAND" == "run" ]]; then
+    if [[ "$PARAMETER" == "-s" ]]; then
+      dokku-log-info "Running system updates"
+      SYSTEM_UPDATES=true
+    else
+      dokku-log-info "Updating Dokku"
+      SYSTEM_UPDATES=false
+    fi
 
-  # update all plugins
-  dokku-log-info "Updating all plugins"
-  for PLUGIN_NAME in $(dokku plugin:list | grep enabled | awk '$1=$1' | cut -d' ' -f1); do
-    dokku-update-plugin "$PLUGIN_NAME"
-  done
-  dokku plugin:install
+    case "$DOKKU_DISTRO" in
+      arch)
+        if [ "$SYSTEM_UPDATES" == true ]; then
+          yay -Syyua
+        else
+          yay -Syu docker-image-labeler dokku nginx plugn sshcommand
+        fi
+        ;;
+      debian | ubuntu)
+        apt-get update -qq >/dev/null
 
-  # rebuild all applications
-  dokku-log-info "Rebuilding all applications"
-  dokku ps:rebuild --all
+        if [ "$SYSTEM_UPDATES" == true ]; then
+          apt-get -qq -y dist-upgrade
+        else
+          apt-get install --only-upgrade docker-image-labeler dokku dokku-event-listener dokku-update gliderlabs-sigil herokuish nginx plugn sshcommand
+        fi
+        ;;
+      centos | opensuse | rhel)
+        dokku-log-warn "Updating this operating system is not supported"
+        exit 1
+        ;;
+      *)
+        dokku-log-warn "Updating this operating system is not supported"
+        exit 1
+        ;;
+    esac
 
-  dokku-log-info "Waiting for old containers to stop"
-  sleep 120
-  dokku-log-info "Cleaning up"
-  dokku cleanup --global
+    # update all plugins
+    dokku-log-info "Updating all plugins"
+    for PLUGIN_NAME in $(dokku plugin:list | grep enabled | awk '$1=$1' | cut -d' ' -f1); do
+      dokku-update-plugin "$PLUGIN_NAME"
+    done
+    dokku plugin:install
+
+    # rebuild all applications
+    dokku-log-info "Rebuilding all applications"
+    dokku ps:rebuild --all
+
+    dokku-log-info "Waiting for old containers to stop"
+    sleep 120
+    dokku-log-info "Cleaning up"
+    dokku cleanup --global
+  else
+    echo "Updates Dokku & its dependencies, all enabled plugins and rebuilds all Dokku apps. Optionally installs all other system updates."
+    echo
+    echo "Usage: $PROGRAM_NAME [run|version]"
+    echo "  Options:"
+    echo "    version    Prints version of $PROGRAM_NAME"
+    echo "    run        Triggers the update process; when invoked with optional -s argument, all system updates will be installed"
+  fi
 }
 
 main "$@"
