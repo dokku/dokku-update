@@ -128,24 +128,30 @@ print-help() {
   echo "    run        Triggers the update process; when invoked with optional -s argument, all system updates will be installed"
 }
 
-main() {
-  declare COMMAND="$1"
+print-version() {
   local VERSION
 
-  if [[ "$COMMAND" == "version" ]] || [[ "$COMMAND" == "-v" ]]; then
-    VERSION=UNRELEASED
-    if [[ -f "/var/lib/dokku-update/VERSION" ]]; then
-      VERSION="$(cat /var/lib/dokku-update/VERSION)"
-    fi
-    echo "dokku-update ${VERSION}"
-    exit 0
+  VERSION=UNRELEASED
+  if [[ -f "/var/lib/dokku-update/VERSION" ]]; then
+    VERSION="$(cat /var/lib/dokku-update/VERSION)"
   fi
+  echo "dokku-update ${VERSION}"
+}
 
-  if [[ "$COMMAND" == "run" ]]; then
-    run-update "$@"
-  else
-    print-help
-  fi
+main() {
+  declare COMMAND="$1"
+
+  case "${COMMAND}" in
+    run)
+      run-update "$@"
+      ;;
+    version | -v)
+      print-version
+      ;;
+    *)
+      print-help
+      ;;
+  esac
 }
 
 main "$@"
