@@ -56,7 +56,7 @@ dokku-update-plugin() {
   fi
 }
 
-main() {
+run-update() {
   declare PROGRAM_NAME="$(basename "$0")"
   declare COMMAND="$1"
   declare PARAMETER="$2"
@@ -66,6 +66,71 @@ main() {
     # shellcheck disable=SC1091
     DOKKU_DISTRO=$(. /etc/os-release && echo "$ID")
   fi
+
+  if [[ "$PARAMETER" == "-s" ]]; then
+    dokku-log-info "Running system updates"
+    SYSTEM_UPDATES=true
+  else
+    dokku-log-info "Updating Dokku"
+    SYSTEM_UPDATES=false
+  fi
+
+  case "$DOKKU_DISTRO" in
+    arch)
+      if [ "$SYSTEM_UPDATES" == true ]; then
+        yay -Syyua
+      else
+        yay -Syu docker-image-labeler dokku nginx plugn sshcommand
+      fi
+      ;;
+    debian | ubuntu)
+      apt-get update -qq >/dev/null
+
+      if [ "$SYSTEM_UPDATES" == true ]; then
+        apt-get -qq -y dist-upgrade
+      else
+        apt-get install --only-upgrade docker-image-labeler dokku dokku-event-listener dokku-update gliderlabs-sigil herokuish nginx plugn sshcommand
+      fi
+      ;;
+    centos | opensuse | rhel)
+      dokku-log-warn "Updating this operating system is not supported"
+      exit 1
+      ;;
+    *)
+      dokku-log-warn "Updating this operating system is not supported"
+      exit 1
+      ;;
+  esac
+
+  # update all plugins
+  dokku-log-info "Updating all plugins"
+  for PLUGIN_NAME in $(dokku plugin:list | grep enabled | awk '$1=$1' | cut -d' ' -f1); do
+    dokku-update-plugin "$PLUGIN_NAME"
+  done
+  dokku plugin:install
+
+  # rebuild all applications
+  dokku-log-info "Rebuilding all applications"
+  dokku ps:rebuild --all
+
+  dokku-log-info "Waiting for old containers to stop"
+  sleep 120
+  dokku-log-info "Cleaning up"
+  dokku cleanup --global
+}
+
+print-help() {
+  echo "Updates Dokku & its dependencies, all enabled plugins and rebuilds all Dokku apps. Optionally installs all other system updates."
+  echo
+  echo "Usage: $PROGRAM_NAME [run|version]"
+  echo "  Options:"
+  echo "    version    Prints version of $PROGRAM_NAME"
+  echo "    run        Triggers the update process; when invoked with optional -s argument, all system updates will be installed"
+}
+
+main() {
+  declare COMMAND="$1"
+  local VERSION
 
   if [[ "$COMMAND" == "version" ]] || [[ "$COMMAND" == "-v" ]]; then
     VERSION=UNRELEASED
@@ -77,63 +142,9 @@ main() {
   fi
 
   if [[ "$COMMAND" == "run" ]]; then
-    if [[ "$PARAMETER" == "-s" ]]; then
-      dokku-log-info "Running system updates"
-      SYSTEM_UPDATES=true
-    else
-      dokku-log-info "Updating Dokku"
-      SYSTEM_UPDATES=false
-    fi
-
-    case "$DOKKU_DISTRO" in
-      arch)
-        if [ "$SYSTEM_UPDATES" == true ]; then
-          yay -Syyua
-        else
-          yay -Syu docker-image-labeler dokku nginx plugn sshcommand
-        fi
-        ;;
-      debian | ubuntu)
-        apt-get update -qq >/dev/null
-
-        if [ "$SYSTEM_UPDATES" == true ]; then
-          apt-get -qq -y dist-upgrade
-        else
-          apt-get install --only-upgrade docker-image-labeler dokku dokku-event-listener dokku-update gliderlabs-sigil herokuish nginx plugn sshcommand
-        fi
-        ;;
-      centos | opensuse | rhel)
-        dokku-log-warn "Updating this operating system is not supported"
-        exit 1
-        ;;
-      *)
-        dokku-log-warn "Updating this operating system is not supported"
-        exit 1
-        ;;
-    esac
-
-    # update all plugins
-    dokku-log-info "Updating all plugins"
-    for PLUGIN_NAME in $(dokku plugin:list | grep enabled | awk '$1=$1' | cut -d' ' -f1); do
-      dokku-update-plugin "$PLUGIN_NAME"
-    done
-    dokku plugin:install
-
-    # rebuild all applications
-    dokku-log-info "Rebuilding all applications"
-    dokku ps:rebuild --all
-
-    dokku-log-info "Waiting for old containers to stop"
-    sleep 120
-    dokku-log-info "Cleaning up"
-    dokku cleanup --global
+    run-update "$@"
   else
-    echo "Updates Dokku & its dependencies, all enabled plugins and rebuilds all Dokku apps. Optionally installs all other system updates."
-    echo
-    echo "Usage: $PROGRAM_NAME [run|version]"
-    echo "  Options:"
-    echo "    version    Prints version of $PROGRAM_NAME"
-    echo "    run        Triggers the update process; when invoked with optional -s argument, all system updates will be installed"
+    print-help
   fi
 }
 
