@@ -145,7 +145,7 @@ main() {
     run)
       run-update "$@"
       ;;
-    version | -v)
+    --version | version | -v)
       print-version
       ;;
     *)
