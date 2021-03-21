@@ -89,7 +89,7 @@ run-update() {
       if [ "$SYSTEM_UPDATES" == true ]; then
         apt-get -qq -y dist-upgrade
       else
-        apt-get install --only-upgrade docker-image-labeler dokku dokku-event-listener dokku-update gliderlabs-sigil herokuish nginx plugn sshcommand
+        apt-get -qq -y install --only-upgrade docker-image-labeler dokku dokku-event-listener dokku-update gliderlabs-sigil herokuish netrc nginx plugn procfile-util sshcommand
       fi
       ;;
     centos | opensuse | rhel)
