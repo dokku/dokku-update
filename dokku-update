@@ -92,9 +92,21 @@ run-update() {
         apt-get -qq -y install --only-upgrade docker-image-labeler dokku dokku-event-listener dokku-update gliderlabs-sigil herokuish netrc nginx plugn procfile-util sshcommand
       fi
       ;;
-    centos | opensuse | rhel)
-      dokku-log-warn "Updating this operating system is not supported"
-      exit 1
+    centos | rhel)
+      if [ "$SYSTEM_UPDATES" == true ]; then
+        yum -y update
+      else
+        yum -y update bind-utils cpio curl dos2unix docker-image-labeler git gliderlabs-sigil jq man-db nc netrc nginx plugn procfile-util sshcommand sudo unzip
+      fi
+      ;;
+    opensuse)
+      zypper refresh
+
+      if [ "$SYSTEM_UPDATES" == true ]; then
+        zypper -n update
+      else
+        zypper -n update bind-utils cpio curl dos2unix docker-image-labeler git gliderlabs-sigil jq man-db nc netrc nginx plugn procfile-util sshcommand sudo unzip
+      fi
       ;;
     *)
       dokku-log-warn "Updating this operating system is not supported"
