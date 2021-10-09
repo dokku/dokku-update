@@ -10,6 +10,7 @@ fi
 export DOKKU_ROOT=${DOKKU_ROOT:=~dokku}
 if [[ -f "$DOKKU_ROOT/dokkurc" ]]; then
   if [[ -r $DOKKU_ROOT/dokkurc ]]; then
+    # shellcheck disable=SC1090
     source "$DOKKU_ROOT/dokkurc"
   else
     echo "Unable to read $DOKKU_ROOT/dokkurc for sourcing" 1>&2
@@ -19,6 +20,7 @@ fi
 if [[ -d $DOKKU_ROOT/.dokkurc ]]; then
   for f in $DOKKU_ROOT/.dokkurc/*; do
     if [[ -r "$f" ]]; then
+      # shellcheck disable=SC1090
       source "$f"
     else
       echo "Unable to read $f for sourcing" 1>&2
@@ -57,10 +59,9 @@ dokku-update-plugin() {
 }
 
 run-update() {
-  declare PROGRAM_NAME="$(basename "$0")"
-  declare COMMAND="$1"
-  declare PARAMETER="$2"
-  local DOKKU_DISTRO PLUGIN_NAME VERSION SYSTEM_UPDATES
+  declare COMMAND="$1" PARAMETER="$2"
+  local DOKKU_DISTRO PLUGIN_NAME PROGRAM_NAME SYSTEM_UPDATES VERSION
+  PROGRAM_NAME="$(basename "$0")"
 
   if [[ -f "/etc/os-release" ]]; then
     # shellcheck disable=SC1091
