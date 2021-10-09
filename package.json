@@ -1,6 +1,6 @@
 {
   "name": "dokku-update",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "description": "Updates Dokku & its dependencies, all enabled plugins and rebuilds all Dokku apps. Optionally installs all other system updates",
   "global": "true",
   "install": "cp dokku-update /usr/local/bin && chmod +x /usr/local/bin/dokku-update",
