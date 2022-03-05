@@ -35,6 +35,7 @@ export DOKKU_LIB_ROOT=${DOKKU_LIB_PATH:="/var/lib/dokku"}
 export PLUGIN_PATH=${PLUGIN_PATH:="$DOKKU_LIB_ROOT/plugins"}
 export PLUGIN_ENABLED_PATH=${PLUGIN_ENABLED_PATH:="$PLUGIN_PATH/enabled"}
 export DEBIAN_FRONTEND=noninteractive
+declare DOKKU_UPDATE_VERSION=""
 
 dokku-log-info() {
   declare desc="log info formatter"
@@ -143,13 +144,8 @@ print-help() {
 }
 
 print-version() {
-  local VERSION
-
-  VERSION=UNRELEASED
-  if [[ -f "/var/lib/dokku-update/VERSION" ]]; then
-    VERSION="$(cat /var/lib/dokku-update/VERSION)"
-  fi
-  echo "dokku-update ${VERSION}"
+  declare desc="Shows version"
+  echo "dokku-update ${DOKKU_UPDATE_VERSION}"
 }
 
 main() {
