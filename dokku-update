@@ -86,7 +86,7 @@ run-update() {
         yay -Syu docker-image-labeler dokku nginx plugn sshcommand
       fi
       ;;
-    debian | ubuntu)
+    debian | ubuntu | raspbian)
       apt-get update -qq >/dev/null
 
       if [ "$SYSTEM_UPDATES" == true ]; then
