@@ -93,7 +93,8 @@ run-update() {
         apt-get -qq -y dist-upgrade
       else
         apt-get -qq -y install --only-upgrade docker-image-labeler dokku dokku-event-listener dokku-update gliderlabs-sigil netrc nginx plugn procfile-util sshcommand
-        local OS_ARCH="$(dpkg --print-architecture)"
+        local OS_ARCH
+        OS_ARCH="$(dpkg --print-architecture)"
         if [[ "$OS_ARCH" == "amd64" ]]; then
           apt-get -qq -y install --only-upgrade herokuish
         fi
