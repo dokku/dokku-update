@@ -160,14 +160,14 @@ main() {
     run)
       cmd-run "$@"
       ;;
-    version| -v | --version)
+    version | -v | --version)
       cmd-version
       ;;
     help | -h | --help)
       cmd-help
       ;;
     *)
-      echo " ! Invalid command specified"  1>&2
+      echo " ! Invalid command specified" 1>&2
       echo ""
       cmd-help
       return 1
