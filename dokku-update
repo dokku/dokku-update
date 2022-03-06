@@ -60,7 +60,7 @@ dokku-update-plugin() {
   fi
 }
 
-run-update() {
+cmd-run() {
   declare COMMAND="$1" PARAMETER="$2"
   local DOKKU_DISTRO PLUGIN_NAME PROGRAM_NAME SYSTEM_UPDATES
   PROGRAM_NAME="$(basename "$0")"
@@ -139,16 +139,16 @@ run-update() {
   dokku cleanup --global
 }
 
-print-help() {
+cmd-help() {
   echo "Updates Dokku & its dependencies, all enabled plugins and rebuilds all Dokku apps. Optionally installs all other system updates."
   echo
   echo "Usage: $PROGRAM_NAME [run|version]"
-  echo "  Options:"
+  echo "  Commands:"
   echo "    version    Prints version of $PROGRAM_NAME"
   echo "    run        Triggers the update process; when invoked with optional -s argument, all system updates will be installed"
 }
 
-print-version() {
+cmd-version() {
   declare desc="Shows version"
   echo "dokku-update ${DOKKU_UPDATE_VERSION}"
 }
@@ -158,13 +158,19 @@ main() {
 
   case "${COMMAND}" in
     run)
-      run-update "$@"
+      cmd-run "$@"
       ;;
-    --version | version | -v)
-      print-version
+    version | -v | --version)
+      cmd-version
+      ;;
+    help | -h | --help)
+      cmd-help
       ;;
     *)
-      print-help
+      echo " ! Invalid command specified" 1>&2
+      echo ""
+      cmd-help
+      return 1
       ;;
   esac
 }
