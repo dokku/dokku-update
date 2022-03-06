@@ -6,7 +6,7 @@ MAINTAINER_NAME = Jose Diaz-Gonzalez
 REPOSITORY = dokku-update
 HARDWARE = $(shell uname -m)
 SYSTEM_NAME  = $(shell uname -s | tr '[:upper:]' '[:lower:]')
-BASE_VERSION ?= 0.4.2
+BASE_VERSION ?= 0.4.3
 IMAGE_NAME ?= $(MAINTAINER)/$(REPOSITORY)
 PACKAGECLOUD_REPOSITORY ?= dokku/dokku-betafish
 
