@@ -62,7 +62,7 @@ dokku-update-plugin() {
 
 run-update() {
   declare COMMAND="$1" PARAMETER="$2"
-  local DOKKU_DISTRO PLUGIN_NAME PROGRAM_NAME SYSTEM_UPDATES VERSION
+  local DOKKU_DISTRO PLUGIN_NAME PROGRAM_NAME SYSTEM_UPDATES
   PROGRAM_NAME="$(basename "$0")"
 
   if [[ -f "/etc/os-release" ]]; then
