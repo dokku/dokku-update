@@ -60,61 +60,115 @@ dokku-update-plugin() {
   fi
 }
 
-run-update() {
+cmd-update-apt() {
+  declare SYSTEM_UPDATES="$1"
+  local packages
+
+  apt-get update -qq >/dev/null
+
+  if [[ "$SYSTEM_UPDATES" == true ]]; then
+    apt-get -qq -y dist-upgrade
+  else
+    packages=("docker-image-labeler" "dokku" "dokku-event-listener" "dokku-update" "gliderlabs-sigil" "netrc" "nginx" "plugn" "procfile-util" "sshcommand")
+    local OS_ARCH
+    OS_ARCH="$(dpkg --print-architecture)"
+    if [[ "$OS_ARCH" == "amd64" ]]; then
+      packages+=("herokuish")
+    fi
+
+    apt-get -qq -y install --only-upgrade "${packages[@]}"
+  fi
+}
+
+cmd-update-arch() {
+  declare SYSTEM_UPDATES="$1"
+
+  if [[ "$SYSTEM_UPDATES" == true ]]; then
+    yay -Syyua
+  else
+    yay -Syu docker-image-labeler dokku nginx plugn sshcommand
+  fi
+}
+
+cmd-update-opensuse() {
+  declare SYSTEM_UPDATES="$1"
+
+  zypper refresh
+
+  if [ "$SYSTEM_UPDATES" == true ]; then
+    zypper -n update
+  else
+    zypper -n update bind-utils cpio curl dos2unix docker-image-labeler git gliderlabs-sigil jq man-db nc netrc nginx plugn procfile-util sshcommand sudo unzip
+  fi
+}
+
+cmd-update-yum() {
+  declare SYSTEM_UPDATES="$1"
+
+  if [ "$SYSTEM_UPDATES" == true ]; then
+    yum -y update
+  else
+    yum -y update bind-utils cpio curl dos2unix docker-image-labeler git gliderlabs-sigil jq man-db nc netrc nginx plugn procfile-util sshcommand sudo unzip
+  fi
+}
+
+cmd-run() {
   declare COMMAND="$1" PARAMETER="$2"
-  local DOKKU_DISTRO PLUGIN_NAME PROGRAM_NAME SYSTEM_UPDATES VERSION
-  PROGRAM_NAME="$(basename "$0")"
+  local DOKKU_DISTRO PLUGIN_NAME REBUILD_APPS=true SYSTEM_UPDATES=false UPDATE_PLUGINS=true
 
   if [[ -f "/etc/os-release" ]]; then
     # shellcheck disable=SC1091
     DOKKU_DISTRO=$(. /etc/os-release && echo "$ID")
   fi
 
-  if [[ "$PARAMETER" == "-s" ]]; then
+  local POSITIONAL_ARGS=()
+  while [[ $# -gt 0 ]]; do
+    case $1 in
+      -h | --help)
+        cmd-help-run
+        return
+        ;;
+      --skip-rebuild)
+        REBUILD_APPS=false
+        shift
+        ;;
+      --skip-plugins)
+        UPDATE_PLUGINS=false
+        shift
+        ;;
+      -s | --system-update)
+        SYSTEM_UPDATES=true
+        shift
+        ;;
+      -*)
+        echo "Unknown option $1"
+        exit 1
+        ;;
+      *)
+        POSITIONAL_ARGS+=("$1")
+        shift
+        ;;
+    esac
+  done
+
+  if [[ "$SYSTEM_UPDATES" == "true" ]]; then
     dokku-log-info "Running system updates"
-    SYSTEM_UPDATES=true
   else
     dokku-log-info "Updating Dokku"
-    SYSTEM_UPDATES=false
   fi
 
   case "$DOKKU_DISTRO" in
     arch)
-      if [ "$SYSTEM_UPDATES" == true ]; then
-        yay -Syyua
-      else
-        yay -Syu docker-image-labeler dokku nginx plugn sshcommand
-      fi
+      cmd-update-arch "$SYSTEM_UPDATES"
       ;;
     debian | ubuntu | raspbian)
-      apt-get update -qq >/dev/null
-
-      if [ "$SYSTEM_UPDATES" == true ]; then
-        apt-get -qq -y dist-upgrade
-      else
-        apt-get -qq -y install --only-upgrade docker-image-labeler dokku dokku-event-listener dokku-update gliderlabs-sigil netrc nginx plugn procfile-util sshcommand
-        local OS_ARCH
-        OS_ARCH="$(dpkg --print-architecture)"
-        if [[ "$OS_ARCH" == "amd64" ]]; then
-          apt-get -qq -y install --only-upgrade herokuish
-        fi
-      fi
+      cmd-update-apt "$SYSTEM_UPDATES"
       ;;
     centos | rhel)
-      if [ "$SYSTEM_UPDATES" == true ]; then
-        yum -y update
-      else
-        yum -y update bind-utils cpio curl dos2unix docker-image-labeler git gliderlabs-sigil jq man-db nc netrc nginx plugn procfile-util sshcommand sudo unzip
-      fi
+      cmd-update-yum "$SYSTEM_UPDATES"
       ;;
     opensuse)
-      zypper refresh
-
-      if [ "$SYSTEM_UPDATES" == true ]; then
-        zypper -n update
-      else
-        zypper -n update bind-utils cpio curl dos2unix docker-image-labeler git gliderlabs-sigil jq man-db nc netrc nginx plugn procfile-util sshcommand sudo unzip
-      fi
+      cmd-update-opensuse "$SYSTEM_UPDATES"
       ;;
     *)
       dokku-log-warn "Updating this operating system is not supported"
@@ -122,33 +176,77 @@ run-update() {
       ;;
   esac
 
-  # update all plugins
-  dokku-log-info "Updating all plugins"
-  for PLUGIN_NAME in $(dokku plugin:list | grep enabled | awk '$1=$1' | cut -d' ' -f1); do
-    dokku-update-plugin "$PLUGIN_NAME"
-  done
-  dokku plugin:install
+  if [[ "$UPDATE_PLUGINS" == "true" ]]; then
+    # update all plugins
+    dokku-log-info "Updating all plugins"
+    for PLUGIN_NAME in $(dokku plugin:list | grep enabled | awk '$1=$1' | cut -d' ' -f1); do
+      dokku-update-plugin "$PLUGIN_NAME"
+    done
+    dokku plugin:install
+  fi
 
-  # rebuild all applications
-  dokku-log-info "Rebuilding all applications"
-  dokku ps:rebuild --all
+  if [[ "$REBUILD_APPS" == "true" ]]; then
+    # rebuild all applications
+    dokku-log-info "Rebuilding all applications"
+    dokku ps:rebuild --all
 
-  dokku-log-info "Waiting for old containers to stop"
-  sleep 120
-  dokku-log-info "Cleaning up"
+    dokku-log-info "Waiting for old containers to stop"
+    sleep 120
+  fi
+
   dokku cleanup --global
 }
 
-print-help() {
+cmd-help-run() {
+  local PROGRAM_NAME
+  PROGRAM_NAME="$(basename "$0")"
+
+  echo "Triggers the update process"
+  echo
+  echo "Usage: $PROGRAM_NAME run"
+  echo "  Flags:"
+  echo "    -h, --help"
+  echo "      Returns this help output and exits"
+  echo
+  echo "    -s, --system-update"
+  echo "      Applies system updates, potentially causing downtime if Docker is upgraded"
+  echo
+  echo "    --skip-plugins"
+  echo "      Skips updating plugins"
+  echo
+  echo "    --skip-rebuild"
+  echo "      Skips rebuilding apps"
+  echo
+}
+
+cmd-help() {
+  declare CMD="$1"
+  local PROGRAM_NAME
+  PROGRAM_NAME="$(basename "$0")"
+
+  if [[ "$CMD" == "run" ]]; then
+    cmd-help-run
+    return
+  fi
+
+  if [[ "$CMD" == "version" ]]; then
+    echo "Prints version of $PROGRAM_NAME"
+    echo
+    echo "Usage: $PROGRAM_NAME version"
+    echo
+    return
+  fi
+
   echo "Updates Dokku & its dependencies, all enabled plugins and rebuilds all Dokku apps. Optionally installs all other system updates."
   echo
   echo "Usage: $PROGRAM_NAME [run|version]"
-  echo "  Options:"
+  echo "  Commands:"
   echo "    version    Prints version of $PROGRAM_NAME"
   echo "    run        Triggers the update process; when invoked with optional -s argument, all system updates will be installed"
+  echo
 }
 
-print-version() {
+cmd-version() {
   declare desc="Shows version"
   echo "dokku-update ${DOKKU_UPDATE_VERSION}"
 }
@@ -158,13 +256,20 @@ main() {
 
   case "${COMMAND}" in
     run)
-      run-update "$@"
+      cmd-run "$@"
       ;;
-    --version | version | -v)
-      print-version
+    version | -v | --version)
+      cmd-version
+      ;;
+    help | -h | --help)
+      shift
+      cmd-help "$@"
       ;;
     *)
-      print-help
+      echo " ! Invalid command specified" 1>&2
+      echo ""
+      cmd-help
+      return 1
       ;;
   esac
 }
