@@ -241,8 +241,8 @@ cmd-help() {
   echo
   echo "Usage: $PROGRAM_NAME [run|version]"
   echo "  Commands:"
-  echo "    version    Prints version of $PROGRAM_NAME"
-  echo "    run        Triggers the update process; when invoked with optional -s argument, all system updates will be installed"
+  echo "    version                                                      Prints version of $PROGRAM_NAME"
+  echo "    run [-s|--system-update] [--skip-plugins] [--skip-rebuild]   Triggers the update process"
   echo
 }
 
