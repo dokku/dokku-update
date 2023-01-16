@@ -102,16 +102,6 @@ cmd-update-opensuse() {
   fi
 }
 
-cmd-update-yum() {
-  declare SYSTEM_UPDATES="$1"
-
-  if [ "$SYSTEM_UPDATES" == true ]; then
-    yum -y update
-  else
-    yum -y update bind-utils cpio curl dos2unix docker-image-labeler git gliderlabs-sigil jq man-db nc netrc nginx plugn procfile-util sshcommand sudo unzip
-  fi
-}
-
 cmd-run() {
   declare COMMAND="$1" PARAMETER="$2"
   local DOKKU_DISTRO PLUGIN_NAME REBUILD_APPS=true SYSTEM_UPDATES=false UPDATE_PLUGINS=true
@@ -163,9 +153,6 @@ cmd-run() {
       ;;
     debian | ubuntu | raspbian)
       cmd-update-apt "$SYSTEM_UPDATES"
-      ;;
-    centos | rhel)
-      cmd-update-yum "$SYSTEM_UPDATES"
       ;;
     opensuse)
       cmd-update-opensuse "$SYSTEM_UPDATES"
