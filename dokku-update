@@ -102,19 +102,11 @@ cmd-update-opensuse() {
   fi
 }
 
-cmd-update-yum() {
-  declare SYSTEM_UPDATES="$1"
-
-  if [ "$SYSTEM_UPDATES" == true ]; then
-    yum -y update
-  else
-    yum -y update bind-utils cpio curl dos2unix docker-image-labeler git gliderlabs-sigil jq man-db nc netrc nginx plugn procfile-util sshcommand sudo unzip
-  fi
-}
-
 cmd-run() {
   declare COMMAND="$1" PARAMETER="$2"
   local DOKKU_DISTRO PLUGIN_NAME REBUILD_APPS=true SYSTEM_UPDATES=false UPDATE_PLUGINS=true
+  declare -a REBUILD_ARGS
+  REBUILD_ARGS+=("--all")
 
   if [[ -f "/etc/os-release" ]]; then
     # shellcheck disable=SC1091
@@ -134,6 +126,11 @@ cmd-run() {
         ;;
       --skip-plugins)
         UPDATE_PLUGINS=false
+        shift
+        ;;
+      --parallel)
+        REBUILD_ARGS+=("--parallel")
+        REBUILD_ARGS+=("-1")
         shift
         ;;
       -s | --system-update)
@@ -164,9 +161,6 @@ cmd-run() {
     debian | ubuntu | raspbian)
       cmd-update-apt "$SYSTEM_UPDATES"
       ;;
-    centos | rhel)
-      cmd-update-yum "$SYSTEM_UPDATES"
-      ;;
     opensuse)
       cmd-update-opensuse "$SYSTEM_UPDATES"
       ;;
@@ -188,7 +182,7 @@ cmd-run() {
   if [[ "$REBUILD_APPS" == "true" ]]; then
     # rebuild all applications
     dokku-log-info "Rebuilding all applications"
-    dokku ps:rebuild --all
+    dokku ps:rebuild "${REBUILD_ARGS[@]}"
 
     dokku-log-info "Waiting for old containers to stop"
     sleep 120
@@ -213,6 +207,9 @@ cmd-help-run() {
   echo
   echo "    --skip-plugins"
   echo "      Skips updating plugins"
+  echo
+  echo "    --parallel"
+  echo "      Rebuild workers set to the number of CPUs available"
   echo
   echo "    --skip-rebuild"
   echo "      Skips rebuilding apps"
@@ -241,8 +238,8 @@ cmd-help() {
   echo
   echo "Usage: $PROGRAM_NAME [run|version]"
   echo "  Commands:"
-  echo "    version    Prints version of $PROGRAM_NAME"
-  echo "    run        Triggers the update process; when invoked with optional -s argument, all system updates will be installed"
+  echo "    version                                                                  Prints version of $PROGRAM_NAME"
+  echo "    run [-s|--system-update] [--skip-plugins] [--parallel] [--skip-rebuild]  Triggers the update process"
   echo
 }
 
