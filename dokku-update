@@ -105,6 +105,8 @@ cmd-update-opensuse() {
 cmd-run() {
   declare COMMAND="$1" PARAMETER="$2"
   local DOKKU_DISTRO PLUGIN_NAME REBUILD_APPS=true SYSTEM_UPDATES=false UPDATE_PLUGINS=true
+  declare -a REBUILD_ARGS
+  REBUILD_ARGS+=("--all")
 
   if [[ -f "/etc/os-release" ]]; then
     # shellcheck disable=SC1091
@@ -127,7 +129,8 @@ cmd-run() {
         shift
         ;;
       --parallel)
-        REBUILD_PARALLEL="--parallel -1"
+        REBUILD_ARGS+=("--parallel")
+        REBUILD_ARGS+=("-1")
         shift
         ;;
       -s | --system-update)
@@ -179,7 +182,7 @@ cmd-run() {
   if [[ "$REBUILD_APPS" == "true" ]]; then
     # rebuild all applications
     dokku-log-info "Rebuilding all applications"
-    dokku ps:rebuild --all $REBUILD_PARALLEL
+    dokku ps:rebuild "${REBUILD_ARGS[@]}"
 
     dokku-log-info "Waiting for old containers to stop"
     sleep 120
