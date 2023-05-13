@@ -7,7 +7,7 @@ Updates Dokku & its dependencies, all enabled plugins and rebuilds all Dokku app
 ## Commands
 
 ```shell
-dokku-update run [-s|--system-update] [--skip-plugins] [--skip-rebuild]    # Triggers the update process
-dokku-update help                                                          # Shows help information
-dokku-update version                                                       # Shows version
+dokku-update run [-s|--system-update] [--skip-plugins] [--parallel] [--skip-rebuild] # Triggers the update process
+dokku-update help                                                                    # Shows help information
+dokku-update version                                                                 # Shows version
 ```
