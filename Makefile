@@ -6,7 +6,7 @@ MAINTAINER_NAME = Jose Diaz-Gonzalez
 REPOSITORY = dokku-update
 HARDWARE = $(shell uname -m)
 SYSTEM_NAME  = $(shell uname -s | tr '[:upper:]' '[:lower:]')
-BASE_VERSION ?= 0.7.1
+BASE_VERSION ?= 0.7.2
 IMAGE_NAME ?= $(MAINTAINER)/$(REPOSITORY)
 PACKAGECLOUD_REPOSITORY ?= dokku/dokku-betafish
 
@@ -157,7 +157,8 @@ unit-tests: /usr/local/bin/dokku-update
 	@$(QUIET) TERM=linux bats --formatter bats-format-junit -e -T -o test-results/bats tests/unit
 
 pre-build:
-	true
+	git config --global --add safe.directory $(shell pwd)
+	git status
 
 /usr/local/bin/dokku-update:
 	@echo installing dokku-update
