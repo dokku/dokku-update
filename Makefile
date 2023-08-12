@@ -156,8 +156,9 @@ unit-tests: /usr/local/bin/dokku-update
 	@mkdir -p test-results/bats
 	@$(QUIET) TERM=linux bats --formatter bats-format-junit -e -T -o test-results/bats tests/unit
 
-pre-build:
-	true
+prebuild:
+	git config --global --add safe.directory $(shell pwd)
+	git status
 
 /usr/local/bin/dokku-update:
 	@echo installing dokku-update
