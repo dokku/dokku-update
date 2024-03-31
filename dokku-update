@@ -173,9 +173,7 @@ cmd-run() {
   if [[ "$UPDATE_PLUGINS" == "true" ]]; then
     # update all plugins
     dokku-log-info "Updating all plugins"
-    for PLUGIN_NAME in $(dokku plugin:list | grep enabled | awk '$1=$1' | cut -d' ' -f1); do
-      dokku-update-plugin "$PLUGIN_NAME"
-    done
+    dokku plugin:update
     dokku plugin:install
   fi
 
