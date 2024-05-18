@@ -47,7 +47,6 @@ targets = $(addsuffix -in-docker, $(LIST))
 	@echo "VERSION=$(VERSION)" >> .env.docker
 
 build: pre-build
-	@$(MAKE) build/darwin/$(NAME)
 	@$(MAKE) build/linux/$(NAME)
 	@$(MAKE) build/deb/$(NAME)_$(VERSION)_all.deb
 
@@ -63,11 +62,6 @@ $(targets): %-in-docker: .env.docker
 		--volume ${PWD}:/src/github.com/$(MAINTAINER)/$(REPOSITORY) \
 		--workdir /src/github.com/$(MAINTAINER)/$(REPOSITORY) \
 		$(IMAGE_NAME):build make -e $(@:-in-docker=)
-
-build/darwin/$(NAME):
-	chmod +x dokku-update
-	mkdir -p build/darwin
-	cp -f dokku-update build/darwin/dokku-update
 
 build/linux/$(NAME):
 	chmod +x dokku-update
@@ -116,7 +110,6 @@ bin/gh-release-body:
 release: bin/gh-release bin/gh-release-body
 	rm -rf release && mkdir release
 	tar -zcf release/$(NAME)_$(VERSION)_linux_$(HARDWARE).tgz -C build/linux $(NAME)
-	tar -zcf release/$(NAME)_$(VERSION)_darwin_$(HARDWARE).tgz -C build/darwin $(NAME)
 	cp build/deb/$(NAME)_$(VERSION)_all.deb release/$(NAME)_$(VERSION)_all.deb
 	bin/gh-release create $(MAINTAINER)/$(REPOSITORY) $(VERSION) $(shell git rev-parse --abbrev-ref HEAD)
 	bin/gh-release-body $(MAINTAINER)/$(REPOSITORY) v$(VERSION)
@@ -127,6 +120,7 @@ release-packagecloud:
 release-packagecloud-deb: build/deb/$(NAME)_$(VERSION)_all.deb
 	package_cloud push $(PACKAGECLOUD_REPOSITORY)/ubuntu/focal build/deb/$(NAME)_$(VERSION)_all.deb
 	package_cloud push $(PACKAGECLOUD_REPOSITORY)/ubuntu/jammy build/deb/$(NAME)_$(VERSION)_all.deb
+	package_cloud push $(PACKAGECLOUD_REPOSITORY)/ubuntu/noble build/deb/$(NAME)_$(VERSION)_all.deb
 	package_cloud push $(PACKAGECLOUD_REPOSITORY)/debian/bullseye build/deb/$(NAME)_$(VERSION)_all.deb
 	package_cloud push $(PACKAGECLOUD_REPOSITORY)/debian/bookworm build/deb/$(NAME)_$(VERSION)_all.deb
 	package_cloud push $(PACKAGECLOUD_REPOSITORY)/raspbian/bullseye build/deb/$(NAME)_$(VERSION)_all.deb
