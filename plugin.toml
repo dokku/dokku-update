@@ -1,0 +1,9 @@
+[plugin]
+name = "dokku-update"
+maintainer = "dokku"
+description = "Provides commands to update Dokku and installed plugins."
+version = "0.1.0"
+license = "MIT"
+homepage = "https://github.com/dokku/dokku-update"
+repository = "https://github.com/dokku/dokku-update"
+provides = ["update"]
