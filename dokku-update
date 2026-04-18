@@ -61,27 +61,41 @@ dokku-update-plugin() {
 }
 
 cmd-update-apt() {
-  declare SYSTEM_UPDATES="$1"
-  local packages
+  declare SYSTEM_UPDATES="$1" TARGET_VERSION="$2"
 
   apt-get update -qq >/dev/null
 
   if [[ "$SYSTEM_UPDATES" == true ]]; then
     apt-get -qq -y dist-upgrade
-  else
-    packages=("docker-image-labeler" "dokku" "dokku-event-listener" "dokku-update" "gliderlabs-sigil" "netrc" "nginx" "plugn" "procfile-util" "sshcommand")
-    local OS_ARCH
-    OS_ARCH="$(dpkg --print-architecture)"
-    if [[ "$OS_ARCH" == "amd64" ]]; then
-      packages+=("herokuish")
-    fi
+    return
+  fi
 
+  local packages dokku_pkg="dokku"
+  if [[ -n "$TARGET_VERSION" ]]; then
+    dokku_pkg="dokku=$TARGET_VERSION"
+  fi
+
+  packages=("docker-image-labeler" "$dokku_pkg" "dokku-event-listener" "dokku-update" "gliderlabs-sigil" "netrc" "nginx" "plugn" "procfile-util" "sshcommand")
+  local OS_ARCH
+  OS_ARCH="$(dpkg --print-architecture)"
+  if [[ "$OS_ARCH" == "amd64" ]]; then
+    packages+=("herokuish")
+  fi
+
+  if [[ -n "$TARGET_VERSION" ]]; then
+    apt-get -qq -y --allow-downgrades install "${packages[@]}"
+  else
     apt-get -qq -y install --only-upgrade "${packages[@]}"
   fi
 }
 
 cmd-update-arch() {
-  declare SYSTEM_UPDATES="$1"
+  declare SYSTEM_UPDATES="$1" TARGET_VERSION="$2"
+
+  if [[ -n "$TARGET_VERSION" ]]; then
+    dokku-log-warn "Version pinning is not supported on Arch Linux"
+    exit 1
+  fi
 
   if [[ "$SYSTEM_UPDATES" == true ]]; then
     yay -Syyua
@@ -91,12 +105,14 @@ cmd-update-arch() {
 }
 
 cmd-update-opensuse() {
-  declare SYSTEM_UPDATES="$1"
+  declare SYSTEM_UPDATES="$1" TARGET_VERSION="$2"
 
   zypper refresh
 
-  if [ "$SYSTEM_UPDATES" == true ]; then
+  if [[ "$SYSTEM_UPDATES" == true ]]; then
     zypper -n update
+  elif [[ -n "$TARGET_VERSION" ]]; then
+    zypper -n install "dokku=$TARGET_VERSION"
   else
     zypper -n update bind-utils cpio curl dos2unix docker-image-labeler git gliderlabs-sigil jq man-db nc netrc nginx plugn procfile-util sshcommand sudo unzip
   fi
@@ -104,7 +120,7 @@ cmd-update-opensuse() {
 
 cmd-run() {
   declare COMMAND="$1" PARAMETER="$2"
-  local DOKKU_DISTRO PLUGIN_NAME REBUILD_APPS=true SYSTEM_UPDATES=false UPDATE_PLUGINS=true
+  local DOKKU_DISTRO DOKKU_TARGET_VERSION="" PLUGIN_NAME REBUILD_APPS=true SYSTEM_UPDATES=false UPDATE_PLUGINS=true
   declare -a REBUILD_ARGS
   REBUILD_ARGS+=("--all")
 
@@ -137,6 +153,15 @@ cmd-run() {
         SYSTEM_UPDATES=true
         shift
         ;;
+      --dokku-version)
+        DOKKU_TARGET_VERSION="$2"
+        if [[ -z "$DOKKU_TARGET_VERSION" ]]; then
+          echo "--dokku-version requires a version argument"
+          exit 1
+        fi
+        shift
+        shift
+        ;;
       -*)
         echo "Unknown option $1"
         exit 1
@@ -148,21 +173,33 @@ cmd-run() {
     esac
   done
 
+  if [[ -n "$DOKKU_TARGET_VERSION" ]] && [[ "$SYSTEM_UPDATES" == "true" ]]; then
+    echo "--dokku-version cannot be used with --system-update"
+    exit 1
+  fi
+
+  if [[ -n "$DOKKU_TARGET_VERSION" ]] && ! [[ "$DOKKU_TARGET_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+    echo "Invalid version format: $DOKKU_TARGET_VERSION (expected format: X.Y.Z)"
+    exit 1
+  fi
+
   if [[ "$SYSTEM_UPDATES" == "true" ]]; then
     dokku-log-info "Running system updates"
+  elif [[ -n "$DOKKU_TARGET_VERSION" ]]; then
+    dokku-log-info "Updating Dokku to version $DOKKU_TARGET_VERSION"
   else
     dokku-log-info "Updating Dokku"
   fi
 
   case "$DOKKU_DISTRO" in
     arch)
-      cmd-update-arch "$SYSTEM_UPDATES"
+      cmd-update-arch "$SYSTEM_UPDATES" "$DOKKU_TARGET_VERSION"
       ;;
     debian | ubuntu | raspbian)
-      cmd-update-apt "$SYSTEM_UPDATES"
+      cmd-update-apt "$SYSTEM_UPDATES" "$DOKKU_TARGET_VERSION"
       ;;
     opensuse)
-      cmd-update-opensuse "$SYSTEM_UPDATES"
+      cmd-update-opensuse "$SYSTEM_UPDATES" "$DOKKU_TARGET_VERSION"
       ;;
     *)
       dokku-log-warn "Updating this operating system is not supported"
@@ -212,6 +249,10 @@ cmd-help-run() {
   echo "    --skip-rebuild"
   echo "      Skips rebuilding apps"
   echo
+  echo "    --dokku-version <version>"
+  echo "      Update to a specific Dokku version (e.g., --dokku-version 0.29.0)"
+  echo "      Cannot be used with --system-update"
+  echo
 }
 
 cmd-help() {
@@ -236,8 +277,8 @@ cmd-help() {
   echo
   echo "Usage: $PROGRAM_NAME [run|version]"
   echo "  Commands:"
-  echo "    version                                                                  Prints version of $PROGRAM_NAME"
-  echo "    run [-s|--system-update] [--skip-plugins] [--parallel] [--skip-rebuild]  Triggers the update process"
+  echo "    version                                                                                                Prints version of $PROGRAM_NAME"
+  echo "    run [-s|--system-update] [--skip-plugins] [--parallel] [--skip-rebuild] [--dokku-version <version>]  Triggers the update process"
   echo
 }
 
