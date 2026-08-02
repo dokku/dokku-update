@@ -195,7 +195,7 @@ cmd-run() {
     arch)
       cmd-update-arch "$SYSTEM_UPDATES" "$DOKKU_TARGET_VERSION"
       ;;
-    debian | ubuntu | raspbian)
+    debian | ubuntu)
       cmd-update-apt "$SYSTEM_UPDATES" "$DOKKU_TARGET_VERSION"
       ;;
     opensuse)
