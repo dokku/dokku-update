@@ -52,6 +52,44 @@ dokku-log-warn() {
   echo " !     $*" 1>&2
 }
 
+dokku-run-with-delayed-output() {
+  declare desc="runs a command silently, streaming its output once it runs longer than the delay"
+  declare DELAY="$1" DESCRIPTION="$2"
+  shift 2
+  local elapsed=0 exit_code=0 log_file pid streamed=false tail_pid=""
+
+  log_file="$(mktemp)"
+  "$@" >"$log_file" &
+  pid=$!
+
+  # background jobs ignore SIGINT in non-interactive shells, so stop the command explicitly
+  trap 'kill "$pid" ${tail_pid:+"$tail_pid"} 2>/dev/null; rm -f "$log_file"; exit 130' INT TERM
+
+  while kill -0 "$pid" 2>/dev/null; do
+    if [[ "$elapsed" -ge "$DELAY" ]]; then
+      dokku-log-warn "$DESCRIPTION is taking longer than $DELAY seconds, streaming output"
+      # tail runs in the background so that signals interrupt the wait and trigger the trap
+      tail -n +1 -f --pid="$pid" "$log_file" &
+      tail_pid=$!
+      wait "$tail_pid" || true
+      streamed=true
+      break
+    fi
+    sleep 1
+    elapsed=$((elapsed + 1))
+  done
+
+  wait "$pid" || exit_code=$?
+  trap - INT TERM
+
+  if [[ "$exit_code" -ne 0 ]] && [[ "$streamed" != "true" ]]; then
+    cat "$log_file" 1>&2
+  fi
+
+  rm -f "$log_file"
+  return "$exit_code"
+}
+
 dokku-update-plugin() {
   declare PLUGIN_NAME="$1"
   if [[ -d "$PLUGIN_ENABLED_PATH/$PLUGIN_NAME/.git" ]]; then
@@ -61,9 +99,9 @@ dokku-update-plugin() {
 }
 
 cmd-update-apt() {
-  declare SYSTEM_UPDATES="$1" TARGET_VERSION="$2"
+  declare SYSTEM_UPDATES="$1" TARGET_VERSION="$2" OUTPUT_DELAY="$3"
 
-  apt-get update -qq >/dev/null
+  dokku-run-with-delayed-output "$OUTPUT_DELAY" "apt-get update" apt-get -q update
 
   if [[ "$SYSTEM_UPDATES" == true ]]; then
     apt-get -qq -y dist-upgrade
@@ -120,7 +158,7 @@ cmd-update-opensuse() {
 
 cmd-run() {
   declare COMMAND="$1" PARAMETER="$2"
-  local DOKKU_DISTRO DOKKU_TARGET_VERSION="" PLUGIN_NAME REBUILD_APPS=true SYSTEM_UPDATES=false UPDATE_PLUGINS=true
+  local DOKKU_DISTRO DOKKU_TARGET_VERSION="" OUTPUT_DELAY="${DOKKU_UPDATE_OUTPUT_DELAY:-30}" PLUGIN_NAME REBUILD_APPS=true SYSTEM_UPDATES=false UPDATE_PLUGINS=true
   declare -a REBUILD_ARGS
   REBUILD_ARGS+=("--all")
 
@@ -162,6 +200,15 @@ cmd-run() {
         shift
         shift
         ;;
+      --output-delay)
+        OUTPUT_DELAY="$2"
+        if [[ -z "$OUTPUT_DELAY" ]]; then
+          echo "--output-delay requires a value in seconds"
+          exit 1
+        fi
+        shift
+        shift
+        ;;
       -*)
         echo "Unknown option $1"
         exit 1
@@ -183,6 +230,11 @@ cmd-run() {
     exit 1
   fi
 
+  if ! [[ "$OUTPUT_DELAY" =~ ^[0-9]+$ ]]; then
+    echo "Invalid output delay: $OUTPUT_DELAY (expected a non-negative number of seconds)"
+    exit 1
+  fi
+
   if [[ "$SYSTEM_UPDATES" == "true" ]]; then
     dokku-log-info "Running system updates"
   elif [[ -n "$DOKKU_TARGET_VERSION" ]]; then
@@ -196,7 +248,7 @@ cmd-run() {
       cmd-update-arch "$SYSTEM_UPDATES" "$DOKKU_TARGET_VERSION"
       ;;
     debian | ubuntu)
-      cmd-update-apt "$SYSTEM_UPDATES" "$DOKKU_TARGET_VERSION"
+      cmd-update-apt "$SYSTEM_UPDATES" "$DOKKU_TARGET_VERSION" "$OUTPUT_DELAY"
       ;;
     opensuse)
       cmd-update-opensuse "$SYSTEM_UPDATES" "$DOKKU_TARGET_VERSION"
@@ -253,6 +305,10 @@ cmd-help-run() {
   echo "      Update to a specific Dokku version (e.g., --dokku-version 0.29.0)"
   echo "      Cannot be used with --system-update"
   echo
+  echo "    --output-delay <seconds>"
+  echo "      Seconds to wait before streaming output from slow package index updates (default: 30)"
+  echo "      Can also be set via the DOKKU_UPDATE_OUTPUT_DELAY environment variable"
+  echo
 }
 
 cmd-help() {
@@ -277,8 +333,8 @@ cmd-help() {
   echo
   echo "Usage: $PROGRAM_NAME [run|version]"
   echo "  Commands:"
-  echo "    version                                                                                                Prints version of $PROGRAM_NAME"
-  echo "    run [-s|--system-update] [--skip-plugins] [--parallel] [--skip-rebuild] [--dokku-version <version>]  Triggers the update process"
+  echo "    version                                                                                                                         Prints version of $PROGRAM_NAME"
+  echo "    run [-s|--system-update] [--skip-plugins] [--parallel] [--skip-rebuild] [--dokku-version <version>] [--output-delay <seconds>]  Triggers the update process"
   echo
 }
 
